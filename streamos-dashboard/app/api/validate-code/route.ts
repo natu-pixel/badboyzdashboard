@@ -17,20 +17,19 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServiceClient()
 
-  // Fetch code with joined playlist + device count
    // Fetch code with joined playlist + device count
-  const { data: rawCodeRow, error } = await supabase
+  const { data, error } = (await supabase
     .from('codes_view')
     .select('*')
     .eq('code', code.toUpperCase().trim())
-    .single()
+    .single()) as { data: any; error: any }
 
-  // Cast to any to bypass strict type checking
-  const codeRow = rawCodeRow as any
+  const codeRow = data
 
   if (error || !codeRow) {
     return NextResponse.json({ valid: false, message: 'Invalid activation code' }, { status: 404 })
   }
+
 
 
   // Check expiry
