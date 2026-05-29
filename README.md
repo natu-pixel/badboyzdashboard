@@ -1,4 +1,4 @@
-# STREAM/OS — Admin Dashboard
+#badboyz — Admin Dashboard
 
 IPTV activation code & subscriber management dashboard.  
 Built with **Next.js 14** (App Router) + **Supabase** + **TypeScript**.
