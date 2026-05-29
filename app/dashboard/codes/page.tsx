@@ -7,11 +7,10 @@ import { generateCode } from '@/lib/codes'
 interface Code {
   id: string
   code: string
-  playlist_name: string | null
+  username: string | null
   max_devices: number
   device_count: number
   is_used: boolean
-  subscriber_username: string | null
 }
 
 interface Subscriber {
@@ -163,7 +162,7 @@ export default function CodesPage() {
           {filtered.map(row => (
             <Tr key={row.id}>
               <Td><CodeChip code={row.code} /></Td>
-              <Td style={{ color: 'var(--text-muted)' }}>{row.subscriber_username || '-'}</Td>
+              <Td style={{ color: 'var(--text-muted)' }}>{row.username || '-'}</Td>
               <Td style={{ color: row.device_count >= row.max_devices ? '#f87171' : 'var(--text-muted)' }}>
                 {row.device_count}/{row.max_devices}
               </Td>
