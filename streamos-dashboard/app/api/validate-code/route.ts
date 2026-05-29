@@ -52,14 +52,15 @@ export async function POST(req: NextRequest) {
     }
   }
 
-   // Register device (upsert)
-  await supabase.from('devices').upsert({
+    // Register device (upsert) safely by casting the database execution
+  await (supabase.from('devices').upsert({
     android_id,
     tv_name: tv_name || 'Unknown TV',
     activation_code: code,
     subscriber_id: codeRow.id, // links to subscriber if assigned
     last_active: new Date().toISOString(),
-  }, { onConflict: 'android_id,subscriber_id' })
+  }, { onConflict: 'android_id,subscriber_id' }) as any)
+
 
 
   return NextResponse.json({
