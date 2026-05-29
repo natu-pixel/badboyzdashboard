@@ -89,7 +89,7 @@ export default function CodesPage() {
 
   const filtered = codes.filter(c =>
     c.code.toLowerCase().includes(search.toLowerCase()) ||
-    (c.subscriber_username || '').toLowerCase().includes(search.toLowerCase())
+    (c.username || '').toLowerCase().includes(search.toLowerCase())
   )
 
   return (
