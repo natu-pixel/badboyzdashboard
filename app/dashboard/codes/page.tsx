@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { RefreshCw, Plus, Copy, Trash2, Edit, Check } from 'lucide-react'
 import { Badge, Button, Card, CardHeader, CodeChip, Input, Select, Table, Tr, Td } from '@/components/ui'
 import { generateCode } from '@/lib/codes'
@@ -8,18 +8,14 @@ interface Code {
   id: string
   code: string
   playlist_name: string | null
-  playlist_type: string | null
   max_devices: number
   device_count: number
-  expires_at: string | null
   is_used: boolean
-  subscriber_username: string | null
 }
 
 interface Playlist {
   id: string
   name: string
-  type: 'xtream' | 'm3u'
 }
 
 interface Subscriber {
@@ -100,16 +96,16 @@ export default function CodesPage() {
     fetchCodes()
   }
 
+  useEffect(() => {
+    fetchCodes()
+    fetchPlaylists()
+    fetchSubscribers()
+  }, [])
+
   const filtered = codes.filter(c =>
     c.code.toLowerCase().includes(search.toLowerCase()) ||
     (c.playlist_name || '').toLowerCase().includes(search.toLowerCase())
   )
-
-  const status = codes.find(c => c.code === newCode)?.expires_at
-    ? new Date(codes.find(c => c.code === newCode)!.expires_at!) < new Date()
-      ? 'expired' as const
-      : 'active' as const
-    : 'unused' as const
 
   return (
     <div style={{ padding: 24 }}>

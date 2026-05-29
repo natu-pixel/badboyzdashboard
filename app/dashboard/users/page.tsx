@@ -1,7 +1,7 @@
 'use client'
-import { useState } from 'react'
-import { CalendarPlus, Lock, Trash2, Plus, Tv2, Link2, Check } from 'lucide-react'
-import { Badge, Button, Card, CardHeader, CodeChip, Input, Select, Table, Tr, Td, Modal } from '@/components/ui'
+import { useState, useEffect } from 'react'
+import { Lock, Trash2, Plus, Tv2, Link2, Check } from 'lucide-react'
+import { Badge, Button, Card, CardHeader, Input, Select, Table, Tr, Td, Modal } from '@/components/ui'
 
 type PlaylistType = 'xtream' | 'm3u'
 
@@ -9,11 +9,7 @@ interface User {
   id: string
   username: string
   email: string
-  playlist_type: PlaylistType | null
-  max_devices: number
-  expires_at: string | null
   status: 'active' | 'expired' | 'disabled'
-  device_count: number
 }
 
 const STATUS_MAP = {
@@ -26,8 +22,6 @@ export default function UsersPage() {
   const [search, setSearch] = useState('')
   const [users, setUsers] = useState<User[]>([])
   const [showAddModal, setShowAddModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [editingUser, setEditingUser] = useState<User | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
 
@@ -44,7 +38,6 @@ export default function UsersPage() {
 
   // M3U fields
   const [m3uUrl, setM3uUrl] = useState('')
-  const [epgUrl, setEpgUrl] = useState('')
 
   function resetForm() {
     setUsername('')
@@ -55,7 +48,6 @@ export default function UsersPage() {
     setXtreamUser('')
     setXtreamPass('')
     setM3uUrl('')
-    setEpgUrl('')
   }
 
   async function handleAddUser() {
@@ -65,8 +57,6 @@ export default function UsersPage() {
     const playlistUrl = playlistType === 'xtream'
       ? `${xtreamServer.replace(/\/$/, '')}/get.php?username=${xtreamUser}&password=${xtreamPass}&type=m3u_plus`
       : m3uUrl
-
-    const generatedCode = Math.random().toString(36).substring(2, 7).toUpperCase()
 
     const res = await fetch('/api/subscribers', {
       method: 'POST',
@@ -98,16 +88,20 @@ export default function UsersPage() {
     setUsers(data.subscribers || [])
   }
 
+  useEffect(() => {
+    fetchUsers()
+  }, [])
+
   async function handleDelete(id: string) {
     await fetch(`/api/subscribers/${id}`, { method: 'DELETE' })
     fetchUsers()
   }
 
-  async function handleToggleStatus(user: User) {
-    await fetch(`/api/subscribers/${user.id}`, {
+  async function handleToggleStatus(id: string, status: string) {
+    await fetch(`/api/subscribers/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: user.status === 'active' ? 'disabled' : 'active' })
+      body: JSON.stringify({ status })
     })
     fetchUsers()
   }
@@ -137,28 +131,18 @@ export default function UsersPage() {
           </Button>
         </CardHeader>
 
-        <Table headers={['USERNAME', 'PLAYLIST', 'MAX DEVICES', 'DEVICES', 'STATUS', 'ACTIONS']}>
+        <Table headers={['USERNAME', 'EMAIL', 'STATUS', 'ACTIONS']}>
           {filtered.map(u => (
             <Tr key={u.id}>
               <Td>
                 <div style={{ fontWeight: 500 }}>{u.username}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{u.email}</div>
               </Td>
-              <Td style={{ color: 'var(--text-muted)' }}>
-                {u.playlist_type ? u.playlist_type.toUpperCase() : '-'}
-              </Td>
-              <Td style={{ color: 'var(--text-muted)' }}>{u.max_devices}</Td>
-              <Td style={{ color: u.device_count >= u.max_devices ? '#f87171' : 'var(--text-muted)' }}>
-                {u.device_count}/{u.max_devices}
-              </Td>
+              <Td style={{ color: 'var(--text-muted)' }}>{u.email}</Td>
               <Td>{STATUS_MAP[u.status]}</Td>
               <Td>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <Button size="sm" variant="ghost" onClick={() => handleToggleStatus(u)} title={u.status === 'active' ? 'Disable access' : 'Enable access'}>
+                  <Button size="sm" variant="ghost" onClick={() => handleToggleStatus(u.id, u.status === 'active' ? 'disabled' : 'active')} title={u.status === 'active' ? 'Disable access' : 'Enable access'}>
                     <Lock size={11} />
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setEditingUser(u); setShowEditModal(true) }} title="Edit user">
-                    <CalendarPlus size={11} />
                   </Button>
                   <Button size="sm" variant="danger" onClick={() => handleDelete(u.id)} title="Delete user">
                     <Trash2 size={11} />
@@ -227,16 +211,10 @@ export default function UsersPage() {
               </div>
             </>
           ) : (
-            <>
-              <div>
-                <label style={{ display: 'block', fontSize: 10, letterSpacing: 1, color: 'var(--text-muted)', marginBottom: 4 }}>M3U URL</label>
-                <Input value={m3uUrl} onChange={e => setM3uUrl(e.target.value)} placeholder="http://..." />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 10, letterSpacing: 1, color: 'var(--text-muted)', marginBottom: 4 }}>EPG URL (OPTIONAL)</label>
-                <Input value={epgUrl} onChange={e => setEpgUrl(e.target.value)} placeholder="http://..." />
-              </div>
-            </>
+            <div>
+              <label style={{ display: 'block', fontSize: 10, letterSpacing: 1, color: 'var(--text-muted)', marginBottom: 4 }}>M3U URL</label>
+              <Input value={m3uUrl} onChange={e => setM3uUrl(e.target.value)} placeholder="http://..." />
+            </div>
           )}
 
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
