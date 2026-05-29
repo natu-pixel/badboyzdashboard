@@ -15,7 +15,6 @@ const NAV = [
     { href: '/dashboard/devices',       icon: Tv2,        label: 'Devices' },
   ]},
   { label: 'CONFIG', items: [
-    { href: '/dashboard/playlists',     icon: List,       label: 'Playlists' },
     { href: '/dashboard/announcements', icon: Megaphone,  label: 'Announcements' },
   ]},
 ]

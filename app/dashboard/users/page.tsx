@@ -50,7 +50,7 @@ export default function UsersPage() {
     setM3uUrl('')
   }
 
-  async function handleAddUser() {
+async function handleAddUser() {
     if (!username || !email || (!xtreamServer && playlistType === 'xtream') || (!m3uUrl && playlistType === 'm3u')) return
     setIsSubmitting(true)
 

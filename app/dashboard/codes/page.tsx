@@ -11,11 +11,7 @@ interface Code {
   max_devices: number
   device_count: number
   is_used: boolean
-}
-
-interface Playlist {
-  id: string
-  name: string
+  subscriber_username: string | null
 }
 
 interface Subscriber {
@@ -33,11 +29,9 @@ export default function CodesPage() {
   const [newCode, setNewCode] = useState('— — — — —')
   const [search, setSearch] = useState('')
   const [codes, setCodes] = useState<Code[]>([])
-  const [playlists, setPlaylists] = useState<Playlist[]>([])
   const [subscribers, setSubscribers] = useState<Subscriber[]>([])
-  const [selectedPlaylist, setSelectedPlaylist] = useState('')
-  const [maxDevices, setMaxDevices] = useState(1)
   const [selectedSubscriber, setSelectedSubscriber] = useState('')
+  const [maxDevices, setMaxDevices] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
 
@@ -46,7 +40,7 @@ export default function CodesPage() {
   }
 
   async function handleSaveCode() {
-    if (!newCode || newCode === '— — — — —' || !selectedPlaylist) return
+    if (!newCode || newCode === '— — — — —') return
     setIsSubmitting(true)
 
     const res = await fetch('/api/codes', {
@@ -54,9 +48,9 @@ export default function CodesPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         code: newCode,
-        playlist_id: selectedPlaylist,
+        subscriber_id: selectedSubscriber || null,
         max_devices: maxDevices,
-        subscriber_id: selectedSubscriber || null
+        playlist_id: null
       })
     })
 
@@ -65,7 +59,6 @@ export default function CodesPage() {
       setTimeout(() => {
         setSubmitSuccess(false)
         setNewCode('— — — — —')
-        setSelectedPlaylist('')
         setSelectedSubscriber('')
         fetchCodes()
       }, 1500)
@@ -77,12 +70,6 @@ export default function CodesPage() {
     const res = await fetch('/api/codes')
     const data = await res.json()
     setCodes(data.codes || [])
-  }
-
-  async function fetchPlaylists() {
-    const res = await fetch('/api/playlists')
-    const data = await res.json()
-    setPlaylists(data.playlists || [])
   }
 
   async function fetchSubscribers() {
@@ -98,13 +85,12 @@ export default function CodesPage() {
 
   useEffect(() => {
     fetchCodes()
-    fetchPlaylists()
     fetchSubscribers()
   }, [])
 
   const filtered = codes.filter(c =>
     c.code.toLowerCase().includes(search.toLowerCase()) ||
-    (c.playlist_name || '').toLowerCase().includes(search.toLowerCase())
+    (c.subscriber_username || '').toLowerCase().includes(search.toLowerCase())
   )
 
   return (
@@ -136,11 +122,11 @@ export default function CodesPage() {
         {/* Config fields */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '16px' }}>
           <div>
-            <label style={{ display: 'block', fontSize: 10, letterSpacing: 1, color: 'var(--text-muted)', marginBottom: 5 }}>PLAYLIST</label>
-            <Select style={{ width: '100%' }} value={selectedPlaylist} onChange={e => setSelectedPlaylist(e.target.value)}>
-              <option value="">Select playlist...</option>
-              {playlists.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+            <label style={{ display: 'block', fontSize: 10, letterSpacing: 1, color: 'var(--text-muted)', marginBottom: 5 }}>SELECT USER</label>
+            <Select style={{ width: '100%' }} value={selectedSubscriber} onChange={e => setSelectedSubscriber(e.target.value)}>
+              <option value="">Unassigned</option>
+              {subscribers.map(s => (
+                <option key={s.id} value={s.id}>{s.username}</option>
               ))}
             </Select>
           </div>
@@ -152,18 +138,9 @@ export default function CodesPage() {
               <option value={3}>3 devices</option>
             </Select>
           </div>
-          <div>
-            <label style={{ display: 'block', fontSize: 10, letterSpacing: 1, color: 'var(--text-muted)', marginBottom: 5 }}>ASSIGN USER (OPTIONAL)</label>
-            <Select style={{ width: '100%' }} value={selectedSubscriber} onChange={e => setSelectedSubscriber(e.target.value)}>
-              <option value="">Unassigned</option>
-              {subscribers.map(s => (
-                <option key={s.id} value={s.id}>{s.username}</option>
-              ))}
-            </Select>
-          </div>
         </div>
         <div style={{ padding: '0 16px 16px', display: 'flex', gap: 8 }}>
-          <Button variant="primary" style={{ flex: 1, justifyContent: 'center' }} onClick={handleSaveCode} disabled={isSubmitting || submitSuccess || !selectedPlaylist}>
+          <Button variant="primary" style={{ flex: 1, justifyContent: 'center' }} onClick={handleSaveCode} disabled={isSubmitting || submitSuccess}>
             {submitSuccess ? <><Check size={12} /> Code Saved</> : <><Plus size={12} /> SAVE CODE</>}
           </Button>
           <Button variant="ghost" onClick={() => navigator.clipboard.writeText(newCode)} disabled={newCode === '— — — — —'}>
@@ -176,17 +153,17 @@ export default function CodesPage() {
       <Card>
         <CardHeader title="ALL CODES">
           <Input
-            placeholder="search code or playlist..."
+            placeholder="search code or username..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{ width: 220 }}
           />
         </CardHeader>
-        <Table headers={['CODE', 'PLAYLIST', 'DEVICES', 'STATUS', 'ACTIONS']}>
+        <Table headers={['CODE', 'USER', 'DEVICES', 'STATUS', 'ACTIONS']}>
           {filtered.map(row => (
             <Tr key={row.id}>
               <Td><CodeChip code={row.code} /></Td>
-              <Td style={{ color: 'var(--text-muted)' }}>{row.playlist_name || '-'}</Td>
+              <Td style={{ color: 'var(--text-muted)' }}>{row.subscriber_username || '-'}</Td>
               <Td style={{ color: row.device_count >= row.max_devices ? '#f87171' : 'var(--text-muted)' }}>
                 {row.device_count}/{row.max_devices}
               </Td>
