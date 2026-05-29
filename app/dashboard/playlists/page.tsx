@@ -6,11 +6,13 @@ import { generateCode } from '@/lib/codes'
 
 type PlaylistType = 'xtream' | 'm3u'
 
-const MOCK_PLAYLISTS = [
-  { name: 'Premium HD Pack',  type: 'xtream' as const, provider: 'streamerlax.win', codes: 412, active: true },
-  { name: 'Sports Bundle',    type: 'xtream' as const, provider: 'Provider B',      codes: 287, active: true },
-  { name: 'Basic M3U',        type: 'm3u'    as const, provider: 'Self-hosted',     codes: 145, active: true },
-]
+interface Playlist {
+  id: string
+  name: string
+  type: PlaylistType
+  url: string
+  is_active: boolean
+}
 
 function parseXtreamUrl(server: string, user: string, pass: string) {
   const base = server.replace(/\/$/, '')
@@ -21,27 +23,32 @@ function parseXtreamUrl(server: string, user: string, pass: string) {
 }
 
 function parseM3uUrl(m3uUrl: string) {
-  // Try to extract EPG link if embedded as url-tvg
   const match = m3uUrl.match(/url-tvg="([^"]+)"/)
   return { m3u: m3uUrl, epg: match ? match[1] : '' }
 }
 
 export default function PlaylistsPage() {
   const [tab, setTab] = useState<PlaylistType>('xtream')
+  const [playlists, setPlaylists] = useState<Playlist[]>([])
 
   // Xtream fields
-  const [server, setServer]   = useState('')
+  const [server, setServer] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
 
   // M3U fields
-  const [m3uUrl, setM3uUrl]   = useState('')
-  const [epgUrl, setEpgUrl]   = useState('')
+  const [m3uUrl, setM3uUrl] = useState('')
+  const [epgUrl, setEpgUrl] = useState('')
   const [playlistName, setPlaylistName] = useState('')
 
   // Generated code
   const [generatedCode, setGeneratedCode] = useState('')
   const [copied, setCopied] = useState(false)
+
+  // Editing
+  const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   function handleConvert() {
     const code = generateCode(5)
@@ -54,6 +61,57 @@ export default function PlaylistsPage() {
     navigator.clipboard.writeText(generatedCode)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function handleSavePlaylist() {
+    if (!playlistName || !server && tab === 'xtream' || !m3uUrl && tab === 'm3u') return
+    setIsSubmitting(true)
+
+    const url = tab === 'xtream'
+      ? `${server.replace(/\/$/, '')}/get.php?username=${username}&password=${password}&type=m3u_plus`
+      : m3uUrl
+
+    const res = await fetch('/api/playlists', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: playlistName,
+        type: tab,
+        url
+      })
+    })
+
+    if (res.ok) {
+      setGeneratedCode('')
+      setPlaylistName('')
+      setServer('')
+      setUsername('')
+      setPassword('')
+      setM3uUrl('')
+      setEpgUrl('')
+      fetchPlaylists()
+    }
+    setIsSubmitting(false)
+  }
+
+  async function fetchPlaylists() {
+    const res = await fetch('/api/playlists')
+    const data = await res.json()
+    setPlaylists(data.playlists || [])
+  }
+
+  async function handleDelete(id: string) {
+    await fetch(`/api/playlists/${id}`, { method: 'DELETE' })
+    fetchPlaylists()
+  }
+
+  async function handleToggleActive(playlist: Playlist) {
+    await fetch(`/api/playlists/${playlist.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !playlist.is_active })
+    })
+    fetchPlaylists()
   }
 
   const urls = tab === 'xtream'
@@ -71,9 +129,9 @@ export default function PlaylistsPage() {
         <p style={{ fontSize: 20, fontWeight: 600, color: 'var(--text)', marginTop: 4 }}>Playlists</p>
       </div>
 
-      {/* ── ADD PLAYLIST + CONVERT TO CODE ── */}
+      {/* ── ADD PLAYLIST ── */}
       <Card style={{ marginBottom: 16 }}>
-        <CardHeader title="ADD PLAYLIST — CONVERT TO CODE" />
+        <CardHeader title="ADD PLAYLIST" />
 
         {/* Tab switcher */}
         <div style={{ display: 'flex', gap: 0, margin: '0 16px 16px', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }}>
@@ -89,7 +147,7 @@ export default function PlaylistsPage() {
                 transition: 'all 0.15s',
               }}
             >
-              {t === 'xtream' ? 'XTREAM API' : 'M3U / EPG URL'}
+              {t === 'xtream' ? <><Tv2 size={12} style={{ display: 'inline' }} /> XTREAM</> : <><Link2 size={12} style={{ display: 'inline' }} /> M3U</>}
             </button>
           ))}
         </div>
@@ -123,7 +181,7 @@ export default function PlaylistsPage() {
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 10, letterSpacing: 1.5, color: 'var(--text-muted)', marginBottom: 5 }}>PASSWORD</label>
-                <Input placeholder="69sWCgvhv" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%' }} />
+                <Input placeholder="69sWCgvhv" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%' }} type="password" />
               </div>
             </div>
           </div>
@@ -165,71 +223,43 @@ export default function PlaylistsPage() {
           </div>
         )}
 
-        {/* Convert button */}
+        {/* Save button */}
         <div style={{ padding: '0 16px 16px', display: 'flex', gap: 8, alignItems: 'center' }}>
           <Button
             variant="primary"
             style={{ flex: 1, justifyContent: 'center', opacity: canConvert ? 1 : 0.4 }}
-            onClick={handleConvert}
+            onClick={handleSavePlaylist}
+            disabled={isSubmitting || !canConvert}
           >
-            <RefreshCw size={12} /> CONVERT TO CODE
+            <Plus size={12} /> {isSubmitting ? 'Saving...' : 'SAVE PLAYLIST'}
           </Button>
         </div>
-
-        {/* Generated code display */}
-        {generatedCode && (
-          <div style={{ margin: '0 16px 16px' }}>
-            <div style={{ fontSize: 9, letterSpacing: 2, color: 'var(--text-dim)', marginBottom: 6 }}>ACTIVATION CODE</div>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              padding: '16px 20px', background: 'var(--bg-surface)',
-              border: '1px dashed var(--accent)', borderRadius: 6,
-            }}>
-              <span style={{ fontSize: 26, fontWeight: 700, letterSpacing: 8, color: 'var(--accent)', flex: 1 }}>
-                {generatedCode}
-              </span>
-              <button
-                onClick={handleCopy}
-                style={{
-                  background: copied ? '#16a34a22' : 'var(--bg-card)',
-                  border: `1px solid ${copied ? '#16a34a' : 'var(--border)'}`,
-                  borderRadius: 4, padding: '6px 10px', cursor: 'pointer',
-                  color: copied ? '#4ade80' : 'var(--text-muted)',
-                  display: 'flex', alignItems: 'center', gap: 5, fontSize: 11,
-                  fontFamily: 'inherit', fontWeight: 500, transition: 'all 0.15s',
-                }}
-              >
-                {copied ? <><Check size={12} /> COPIED</> : <><Copy size={12} /> COPY</>}
-              </button>
-            </div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 6 }}>
-              This code links to <span style={{ color: 'var(--text-muted)' }}>{playlistName}</span> via {tab === 'xtream' ? 'Xtream API' : 'M3U/EPG'}. Share it with your subscriber to activate.
-            </div>
-          </div>
-        )}
       </Card>
 
       {/* Existing playlists table */}
       <Card>
         <CardHeader title="PLAYLIST ASSIGNMENT">
-          <Button variant="primary" size="sm"><Plus size={12} /> NEW PLAYLIST</Button>
+          <Button variant="primary" size="sm" onClick={() => setShowAddModal(true)}><Plus size={12} /> NEW PLAYLIST</Button>
         </CardHeader>
-        <Table headers={['NAME', 'TYPE', 'PROVIDER URL', 'ASSIGNED CODES', 'STATUS', 'ACTIONS']}>
-          {MOCK_PLAYLISTS.map(p => (
-            <Tr key={p.name}>
+        <Table headers={['NAME', 'TYPE', 'PROVIDER URL', 'STATUS', 'ACTIONS']}>
+          {playlists.map(p => (
+            <Tr key={p.id}>
               <Td style={{ fontWeight: 500 }}>{p.name}</Td>
               <Td>
                 <Badge variant={p.type === 'xtream' ? 'blue' : 'amber'}>
                   {p.type.toUpperCase()}
                 </Badge>
               </Td>
-              <Td style={{ color: 'var(--text-muted)' }}>{p.provider}</Td>
-              <Td style={{ color: 'var(--text-muted)' }}>{p.codes}</Td>
-              <Td><Badge variant="green">ACTIVE</Badge></Td>
+              <Td style={{ color: 'var(--text-muted)', fontSize: 11 }}>{p.url}</Td>
+              <Td><Badge variant={p.is_active ? 'green' : 'gray'}>{p.is_active ? 'ACTIVE' : 'DISABLED'}</Badge></Td>
               <Td>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <Button size="sm" variant="ghost"><Edit size={11} /></Button>
-                  <Button size="sm" variant="danger"><Trash2 size={11} /></Button>
+                  <Button size="sm" variant="ghost" onClick={() => handleToggleActive(p)} title={p.is_active ? 'Disable' : 'Enable'}>
+                    <Edit size={11} />
+                  </Button>
+                  <Button size="sm" variant="danger" onClick={() => handleDelete(p.id)} title="Delete">
+                    <Trash2 size={11} />
+                  </Button>
                 </div>
               </Td>
             </Tr>

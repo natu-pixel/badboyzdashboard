@@ -82,6 +82,7 @@ export interface Database {
           created_at: string
           playlist_name: string | null
           playlist_type: string | null
+          playlist_url: string | null
           username: string | null
           email: string | null
           subscriber_status: string | null

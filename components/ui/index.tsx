@@ -1,4 +1,5 @@
-import React from 'react'
+'use client'
+import React, { useEffect } from 'react'
 
 // --- Badge ---
 type BadgeVariant = 'green' | 'red' | 'amber' | 'blue' | 'gray'
@@ -179,5 +180,50 @@ export function Td({ children, style }: { children: React.ReactNode; style?: Rea
     <td style={{ padding: '10px 16px', color: 'var(--text)', fontSize: 12, ...style }}>
       {children}
     </td>
+  )
+}
+
+// --- Modal ---
+export function Modal({ open, onClose, title, children }: {
+  open: boolean
+  onClose: () => void
+  title: string
+  children: React.ReactNode
+}) {
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden'
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [open])
+
+  if (!open) return null
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(0,0,0,0.7)', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', zIndex: 1000
+    }}>
+      <div style={{
+        background: 'var(--bg-card)', border: '1px solid var(--border)',
+        borderRadius: 8, width: '90%', maxWidth: 500, maxHeight: '80vh',
+        overflow: 'auto'
+      }}>
+        <div style={{
+          padding: '12px 16px', borderBottom: '1px solid var(--border)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+        }}>
+          <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: 1.5, color: 'var(--text)' }}>
+            {title}
+          </span>
+          <button onClick={onClose} style={{
+            background: 'transparent', border: 'none', color: 'var(--text-muted)',
+            cursor: 'pointer', fontSize: 18, padding: 0, lineHeight: 1
+          }}>×</button>
+        </div>
+        <div style={{ padding: 16 }}>{children}</div>
+      </div>
+    </div>
   )
 }

@@ -60,10 +60,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     valid: true,
-    playlist_url: codeRow.playlist_type === 'm3u'
-      ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/playlists/${codeRow.playlist_name}.m3u`
-      : null,
-    // For Xtream, return the full URL stored in playlists table
+    playlist_url: codeRow.playlist_url,
     message: 'Activated successfully',
   })
 }

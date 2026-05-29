@@ -1,15 +1,31 @@
 'use client'
 import { useState } from 'react'
-import { RefreshCw, Plus, Copy, Trash2, Edit } from 'lucide-react'
+import { RefreshCw, Plus, Copy, Trash2, Edit, Check } from 'lucide-react'
 import { Badge, Button, Card, CardHeader, CodeChip, Input, Select, Table, Tr, Td } from '@/components/ui'
 import { generateCode } from '@/lib/codes'
 
-const MOCK_CODES = [
-  { code: 'X82KQ', playlist: 'Premium HD', devices: '1/2', expires: '2026-08-01', status: 'active' as const },
-  { code: 'TR44W', playlist: 'Sports Bundle', devices: '2/2', expires: '2026-07-15', status: 'active' as const },
-  { code: 'PLM9X', playlist: 'Basic M3U',    devices: '0/1', expires: '2026-09-30', status: 'unused' as const },
-  { code: 'ZK01B', playlist: 'Premium HD',   devices: '1/1', expires: '2026-04-01', status: 'expired' as const },
-]
+interface Code {
+  id: string
+  code: string
+  playlist_name: string | null
+  playlist_type: string | null
+  max_devices: number
+  device_count: number
+  expires_at: string | null
+  is_used: boolean
+  subscriber_username: string | null
+}
+
+interface Playlist {
+  id: string
+  name: string
+  type: 'xtream' | 'm3u'
+}
+
+interface Subscriber {
+  id: string
+  username: string
+}
 
 const STATUS_MAP = {
   active:  <Badge variant="green">ACTIVE</Badge>,
@@ -20,15 +36,80 @@ const STATUS_MAP = {
 export default function CodesPage() {
   const [newCode, setNewCode] = useState('— — — — —')
   const [search, setSearch] = useState('')
+  const [codes, setCodes] = useState<Code[]>([])
+  const [playlists, setPlaylists] = useState<Playlist[]>([])
+  const [subscribers, setSubscribers] = useState<Subscriber[]>([])
+  const [selectedPlaylist, setSelectedPlaylist] = useState('')
+  const [maxDevices, setMaxDevices] = useState(1)
+  const [selectedSubscriber, setSelectedSubscriber] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitSuccess, setSubmitSuccess] = useState(false)
 
   function handleGenerate() {
     setNewCode(generateCode(5))
   }
 
-  const filtered = MOCK_CODES.filter(c =>
+  async function handleSaveCode() {
+    if (!newCode || newCode === '— — — — —' || !selectedPlaylist) return
+    setIsSubmitting(true)
+
+    const res = await fetch('/api/codes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: newCode,
+        playlist_id: selectedPlaylist,
+        max_devices: maxDevices,
+        subscriber_id: selectedSubscriber || null
+      })
+    })
+
+    if (res.ok) {
+      setSubmitSuccess(true)
+      setTimeout(() => {
+        setSubmitSuccess(false)
+        setNewCode('— — — — —')
+        setSelectedPlaylist('')
+        setSelectedSubscriber('')
+        fetchCodes()
+      }, 1500)
+    }
+    setIsSubmitting(false)
+  }
+
+  async function fetchCodes() {
+    const res = await fetch('/api/codes')
+    const data = await res.json()
+    setCodes(data.codes || [])
+  }
+
+  async function fetchPlaylists() {
+    const res = await fetch('/api/playlists')
+    const data = await res.json()
+    setPlaylists(data.playlists || [])
+  }
+
+  async function fetchSubscribers() {
+    const res = await fetch('/api/subscribers')
+    const data = await res.json()
+    setSubscribers(data.subscribers || [])
+  }
+
+  async function handleDelete(id: string) {
+    await fetch(`/api/codes/${id}`, { method: 'DELETE' })
+    fetchCodes()
+  }
+
+  const filtered = codes.filter(c =>
     c.code.toLowerCase().includes(search.toLowerCase()) ||
-    c.playlist.toLowerCase().includes(search.toLowerCase())
+    (c.playlist_name || '').toLowerCase().includes(search.toLowerCase())
   )
+
+  const status = codes.find(c => c.code === newCode)?.expires_at
+    ? new Date(codes.find(c => c.code === newCode)!.expires_at!) < new Date()
+      ? 'expired' as const
+      : 'active' as const
+    : 'unused' as const
 
   return (
     <div style={{ padding: 24 }}>
@@ -60,32 +141,34 @@ export default function CodesPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '16px' }}>
           <div>
             <label style={{ display: 'block', fontSize: 10, letterSpacing: 1, color: 'var(--text-muted)', marginBottom: 5 }}>PLAYLIST</label>
-            <Select style={{ width: '100%' }}>
-              <option>Premium HD Pack</option>
-              <option>Sports Bundle</option>
-              <option>Basic M3U</option>
+            <Select style={{ width: '100%' }} value={selectedPlaylist} onChange={e => setSelectedPlaylist(e.target.value)}>
+              <option value="">Select playlist...</option>
+              {playlists.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
             </Select>
           </div>
           <div>
             <label style={{ display: 'block', fontSize: 10, letterSpacing: 1, color: 'var(--text-muted)', marginBottom: 5 }}>MAX DEVICES</label>
-            <Select style={{ width: '100%' }}>
-              <option>1 device</option>
-              <option>2 devices</option>
-              <option>3 devices</option>
+            <Select style={{ width: '100%' }} value={maxDevices} onChange={e => setMaxDevices(Number(e.target.value))}>
+              <option value={1}>1 device</option>
+              <option value={2}>2 devices</option>
+              <option value={3}>3 devices</option>
             </Select>
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 10, letterSpacing: 1, color: 'var(--text-muted)', marginBottom: 5 }}>EXPIRY DATE</label>
-            <Input type="date" style={{ width: '100%' }} />
-          </div>
-          <div>
             <label style={{ display: 'block', fontSize: 10, letterSpacing: 1, color: 'var(--text-muted)', marginBottom: 5 }}>ASSIGN USER (OPTIONAL)</label>
-            <Input type="text" placeholder="username or email" style={{ width: '100%' }} />
+            <Select style={{ width: '100%' }} value={selectedSubscriber} onChange={e => setSelectedSubscriber(e.target.value)}>
+              <option value="">Unassigned</option>
+              {subscribers.map(s => (
+                <option key={s.id} value={s.id}>{s.username}</option>
+              ))}
+            </Select>
           </div>
         </div>
         <div style={{ padding: '0 16px 16px', display: 'flex', gap: 8 }}>
-          <Button variant="primary" style={{ flex: 1, justifyContent: 'center' }}>
-            <Plus size={12} /> SAVE CODE
+          <Button variant="primary" style={{ flex: 1, justifyContent: 'center' }} onClick={handleSaveCode} disabled={isSubmitting || submitSuccess || !selectedPlaylist}>
+            {submitSuccess ? <><Check size={12} /> Code Saved</> : <><Plus size={12} /> SAVE CODE</>}
           </Button>
           <Button variant="ghost" onClick={() => navigator.clipboard.writeText(newCode)} disabled={newCode === '— — — — —'}>
             <Copy size={12} /> COPY
@@ -103,20 +186,19 @@ export default function CodesPage() {
             style={{ width: 220 }}
           />
         </CardHeader>
-        <Table headers={['CODE', 'PLAYLIST', 'DEVICES', 'EXPIRES', 'STATUS', 'ACTIONS']}>
+        <Table headers={['CODE', 'PLAYLIST', 'DEVICES', 'STATUS', 'ACTIONS']}>
           {filtered.map(row => (
-            <Tr key={row.code}>
+            <Tr key={row.id}>
               <Td><CodeChip code={row.code} /></Td>
-              <Td>{row.playlist}</Td>
-              <Td style={{ color: row.devices.startsWith(row.devices.split('/')[1]) ? 'var(--text)' : 'var(--text-muted)' }}>
-                {row.devices}
+              <Td style={{ color: 'var(--text-muted)' }}>{row.playlist_name || '-'}</Td>
+              <Td style={{ color: row.device_count >= row.max_devices ? '#f87171' : 'var(--text-muted)' }}>
+                {row.device_count}/{row.max_devices}
               </Td>
-              <Td style={{ color: 'var(--text-muted)' }}>{row.expires}</Td>
-              <Td>{STATUS_MAP[row.status]}</Td>
+              <Td>{STATUS_MAP[row.is_used ? 'active' : 'unused']}</Td>
               <Td>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <Button size="sm" variant="ghost"><Edit size={11} /></Button>
-                  <Button size="sm" variant="danger"><Trash2 size={11} /></Button>
+                  <Button size="sm" variant="ghost" title="Edit code"><Edit size={11} /></Button>
+                  <Button size="sm" variant="danger" title="Delete code" onClick={() => handleDelete(row.id)}><Trash2 size={11} /></Button>
                 </div>
               </Td>
             </Tr>
