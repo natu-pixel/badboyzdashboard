@@ -58,28 +58,37 @@ async function handleAddUser() {
       ? `${xtreamServer.replace(/\/$/, '')}/get.php?username=${xtreamUser}&password=${xtreamPass}&type=m3u_plus`
       : m3uUrl
 
-    const res = await fetch('/api/subscribers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username,
-        email,
-        playlist_type: playlistType,
-        playlist_url: playlistUrl,
-        max_devices: maxDevices
+    try {
+      const res = await fetch('/api/subscribers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          email,
+          playlist_type: playlistType,
+          playlist_url: playlistUrl,
+          max_devices: maxDevices
+        })
       })
-    })
 
-    if (res.ok) {
-      setSubmitSuccess(true)
-      setTimeout(() => {
-        setSubmitSuccess(false)
-        setShowAddModal(false)
-        resetForm()
-        fetchUsers()
-      }, 1500)
+      if (res.ok) {
+        setSubmitSuccess(true)
+        setTimeout(() => {
+          setSubmitSuccess(false)
+          setShowAddModal(false)
+          resetForm()
+          fetchUsers()
+        }, 1500)
+      } else {
+        const errorData = await res.json()
+        alert(errorData.error || 'Failed to add user. Please try again.')
+        setIsSubmitting(false)
+      }
+    } catch (error) {
+      console.error('Error adding user:', error)
+      alert('Network error. Please check your connection and try again.')
+      setIsSubmitting(false)
     }
-    setIsSubmitting(false)
   }
 
   async function fetchUsers() {
